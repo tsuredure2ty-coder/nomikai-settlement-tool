@@ -162,13 +162,55 @@ select:focus {
 
 .member-row {
   display: grid;
-  grid-template-columns: minmax(94px, 1.2fr) minmax(86px, 1fr) minmax(82px, 0.9fr) 72px 92px 44px;
+  grid-template-columns: minmax(94px, 1.2fr) minmax(86px, 1fr) minmax(82px, 0.9fr) minmax(82px, 0.9fr) 72px 92px 68px 44px;
   gap: 7px;
   align-items: end;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfd;
+}
+
+.organizer-choice,
+.check-field {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.organizer-choice input,
+.check-field input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+}
+
+.template-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.organizer-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--soft-blue);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 800;
+  vertical-align: middle;
 }
 
 .delete-button {
@@ -335,7 +377,7 @@ select:focus {
   }
 
   .member-row {
-    grid-template-columns: 1fr 1fr 1fr 72px 90px 44px;
+    grid-template-columns: 1fr 1fr 1fr 1fr 72px 90px 68px 44px;
     overflow-x: auto;
   }
 
@@ -367,8 +409,13 @@ select:focus {
     grid-column: span 1;
   }
 
+  .member-row .organizer-choice,
   .member-row .delete-button {
     width: 100%;
+  }
+
+  .template-actions {
+    grid-template-columns: 1fr;
   }
 
   .bottom-bar {

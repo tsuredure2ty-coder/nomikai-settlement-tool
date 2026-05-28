@@ -61,6 +61,10 @@
           <h2 id="member-heading">参加者</h2>
         </div>
         <div id="memberList" class="member-list" aria-live="polite"></div>
+        <div class="template-actions">
+          <button id="saveTemplate" class="secondary-button" type="button">参加者テンプレ保存</button>
+          <button id="loadTemplate" class="secondary-button" type="button">参加者テンプレ読込</button>
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="add-heading">
@@ -85,6 +89,11 @@
             <select id="newAdjustment"></select>
           </label>
 
+          <label class="field">
+            <span>参加</span>
+            <select id="newAttendance"></select>
+          </label>
+
           <label class="field small-field">
             <span>倍率</span>
             <input id="newRate" type="number" inputmode="decimal" min="0" step="0.1">
@@ -93,6 +102,11 @@
           <label class="field small-field">
             <span>固定額</span>
             <input id="newFixed" type="number" inputmode="numeric" min="0" step="1" placeholder="任意">
+          </label>
+
+          <label class="check-field">
+            <input id="newOrganizer" type="checkbox">
+            <span>幹事</span>
           </label>
         </div>
 
@@ -127,7 +141,7 @@
 
     <div class="bottom-bar">
       <button id="copyLine" class="primary-button" type="button">LINE用コピー</button>
-      <button id="saveData" class="secondary-button" type="button">保存</button>
+      <button id="saveData" class="secondary-button" type="button">端末保存</button>
       <button id="resetData" class="danger-button" type="button">リセット</button>
     </div>
 

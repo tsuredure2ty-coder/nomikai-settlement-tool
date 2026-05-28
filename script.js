@@ -1,8 +1,9 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "nomikai-settlement-v2";
-  const LEGACY_STORAGE_KEY = "nomikai-settlement-v1";
+  const STORAGE_KEY = "nomikai-settlement-v3";
+  const LEGACY_STORAGE_KEYS = ["nomikai-settlement-v2", "nomikai-settlement-v1"];
+  const TEMPLATE_KEY = "nomikai-member-template-v1";
 
   const roles = [
     { name: "社長", rate: 3.0 },
@@ -12,13 +13,20 @@
     { name: "課長", rate: 1.5 },
     { name: "調査役", rate: 1.3 },
     { name: "一般", rate: 1.0 },
+    { name: "パート", rate: 0.5 },
   ];
 
   const adjustments = [
     { name: "なし", rate: 1.0 },
     { name: "女性", rate: 0.8 },
-    { name: "パート", rate: 0.5 },
     { name: "学生", rate: 0.5 },
+  ];
+
+  const attendanceAdjustments = [
+    { name: "通常", rate: 1.0 },
+    { name: "遅刻", rate: 0.9 },
+    { name: "早退", rate: 0.9 },
+    { name: "遅刻＋早退", rate: 0.8 },
   ];
 
   const state = {
@@ -26,6 +34,7 @@
     totalAmount: 0,
     roundUnit: 100,
     adjustmentMode: "organizer",
+    organizerId: "",
     members: [],
   };
 
@@ -53,9 +62,13 @@
       "newName",
       "newRole",
       "newAdjustment",
+      "newAttendance",
       "newRate",
       "newFixed",
+      "newOrganizer",
       "addMember",
+      "saveTemplate",
+      "loadTemplate",
       "summaryTotal",
       "summaryRounded",
       "summaryDifference",
@@ -98,16 +111,19 @@
 
     elements.newRole.addEventListener("change", updateNewRateFromPresets);
     elements.newAdjustment.addEventListener("change", updateNewRateFromPresets);
+    elements.newAttendance.addEventListener("change", updateNewRateFromPresets);
 
     elements.newRate.addEventListener("input", () => {
       elements.newRate.dataset.custom = "true";
     });
 
     elements.addMember.addEventListener("click", addMember);
+    elements.saveTemplate.addEventListener("click", saveMemberTemplate);
+    elements.loadTemplate.addEventListener("click", loadMemberTemplate);
     elements.copyLine.addEventListener("click", copyForLine);
     elements.saveData.addEventListener("click", () => {
       saveState();
-      showToast("保存しました");
+      showToast("この端末のブラウザ内に保存しました");
     });
     elements.resetData.addEventListener("click", resetData);
   }
@@ -119,11 +135,16 @@
     const adjustmentOptions = adjustments
       .map((adjustment) => `<option value="${escapeHtml(adjustment.name)}">${escapeHtml(adjustment.name)}</option>`)
       .join("");
+    const attendanceOptions = attendanceAdjustments
+      .map((attendance) => `<option value="${escapeHtml(attendance.name)}">${escapeHtml(attendance.name)}</option>`)
+      .join("");
 
     elements.newRole.innerHTML = roleOptions;
     elements.newAdjustment.innerHTML = adjustmentOptions;
+    elements.newAttendance.innerHTML = attendanceOptions;
     elements.newRole.value = "一般";
     elements.newAdjustment.value = "なし";
+    elements.newAttendance.value = "通常";
     elements.newRate.value = "1";
   }
 
@@ -156,6 +177,13 @@
             return `<option value="${escapeHtml(adjustment.name)}"${selected}>${escapeHtml(adjustment.name)}</option>`;
           })
           .join("");
+        const attendanceOptions = attendanceAdjustments
+          .map((attendance) => {
+            const selected = attendance.name === member.attendance ? " selected" : "";
+            return `<option value="${escapeHtml(attendance.name)}"${selected}>${escapeHtml(attendance.name)}</option>`;
+          })
+          .join("");
+        const organizerChecked = member.id === state.organizerId ? " checked" : "";
 
         return `
           <div class="member-row" data-index="${index}">
@@ -171,6 +199,10 @@
               <span>調整</span>
               <select class="member-adjustment">${adjustmentOptions}</select>
             </label>
+            <label class="field">
+              <span>参加</span>
+              <select class="member-attendance">${attendanceOptions}</select>
+            </label>
             <label class="field small-member-field">
               <span>倍率</span>
               <input class="member-rate" type="number" inputmode="decimal" min="0" step="0.1" value="${formatInputNumber(member.rate)}">
@@ -178,6 +210,10 @@
             <label class="field small-member-field">
               <span>固定額</span>
               <input class="member-fixed" type="number" inputmode="numeric" min="0" step="1" value="${member.fixedAmount || ""}" placeholder="任意">
+            </label>
+            <label class="organizer-choice">
+              <input class="member-organizer" type="radio" name="organizer"${organizerChecked}>
+              <span>幹事</span>
             </label>
             <button class="delete-button" type="button" aria-label="${escapeHtml(member.name)}を削除">×</button>
           </div>
@@ -195,7 +231,7 @@
 
       row.querySelector(".member-role").addEventListener("change", (event) => {
         state.members[index].role = event.target.value;
-        state.members[index].rate = getCombinedRate(state.members[index].role, state.members[index].adjustment);
+        state.members[index].rate = getCombinedRate(state.members[index].role, state.members[index].adjustment, state.members[index].attendance);
         renderMembers();
         renderResults();
         persistQuietly();
@@ -203,7 +239,22 @@
 
       row.querySelector(".member-adjustment").addEventListener("change", (event) => {
         state.members[index].adjustment = event.target.value;
-        state.members[index].rate = getCombinedRate(state.members[index].role, state.members[index].adjustment);
+        state.members[index].rate = getCombinedRate(state.members[index].role, state.members[index].adjustment, state.members[index].attendance);
+        renderMembers();
+        renderResults();
+        persistQuietly();
+      });
+
+      row.querySelector(".member-attendance").addEventListener("change", (event) => {
+        state.members[index].attendance = event.target.value;
+        state.members[index].rate = getCombinedRate(state.members[index].role, state.members[index].adjustment, state.members[index].attendance);
+        renderMembers();
+        renderResults();
+        persistQuietly();
+      });
+
+      row.querySelector(".member-organizer").addEventListener("change", () => {
+        state.organizerId = state.members[index].id;
         renderMembers();
         renderResults();
         persistQuietly();
@@ -222,7 +273,10 @@
       });
 
       row.querySelector(".delete-button").addEventListener("click", () => {
-        state.members.splice(index, 1);
+        const removed = state.members.splice(index, 1)[0];
+        if (removed && removed.id === state.organizerId) {
+          state.organizerId = "";
+        }
         renderMembers();
         renderResults();
         persistQuietly();
@@ -234,8 +288,10 @@
     const name = elements.newName.value.trim();
     const roleName = elements.newRole.value;
     const adjustmentName = elements.newAdjustment.value;
-    const rate = readNumber(elements.newRate.value) || getCombinedRate(roleName, adjustmentName);
+    const attendanceName = elements.newAttendance.value;
+    const rate = readNumber(elements.newRate.value) || getCombinedRate(roleName, adjustmentName, attendanceName);
     const fixedAmount = readNumber(elements.newFixed.value);
+    const isOrganizer = elements.newOrganizer.checked;
 
     if (!name) {
       showToast("名前を入力してください");
@@ -248,12 +304,18 @@
       name,
       role: roleName,
       adjustment: adjustmentName,
+      attendance: attendanceName,
       rate,
       fixedAmount,
     });
 
+    if (isOrganizer) {
+      state.organizerId = state.members[state.members.length - 1].id;
+    }
+
     elements.newName.value = "";
     elements.newFixed.value = "";
+    elements.newOrganizer.checked = false;
     elements.newRate.dataset.custom = "";
     updateNewRateFromPresets();
     elements.newName.focus();
@@ -280,11 +342,13 @@
       .map((row) => {
         const fixedLabel = row.isFixed ? "固定額" : `${formatInputNumber(row.rate)}倍`;
         const adjustmentLabel = row.adjustment === "なし" ? "" : ` / ${escapeHtml(row.adjustment)}`;
+        const attendanceLabel = row.attendance === "通常" ? "" : ` / ${escapeHtml(row.attendance)}`;
+        const organizerLabel = row.isOrganizer ? "幹事" : "";
         return `
           <div class="result-row">
             <div>
-              <span class="result-name">${escapeHtml(row.name)}</span>
-              <span class="result-meta">${escapeHtml(row.role)}${adjustmentLabel} / ${fixedLabel}</span>
+              <span class="result-name">${escapeHtml(row.name)}${organizerLabel ? `<span class="organizer-badge">${organizerLabel}</span>` : ""}</span>
+              <span class="result-meta">${escapeHtml(row.role)}${adjustmentLabel}${attendanceLabel} / ${fixedLabel}</span>
             </div>
             <strong class="result-amount">${yen(row.finalAmount)}</strong>
           </div>
@@ -301,6 +365,8 @@
       name: member.name || "名無し",
       role: normalizeRole(member.role || member.category),
       adjustment: normalizeAdjustment(member.adjustment || member.category),
+      attendance: normalizeAttendance(member.attendance),
+      isOrganizer: member.id === state.organizerId,
       rate: Math.max(0, Number(member.rate) || 0),
       fixedAmount: Math.max(0, Number(member.fixedAmount) || 0),
     }));
@@ -333,7 +399,10 @@
     } else if (fixedTotal > total) {
       note = "固定額の合計が総額を超えています。固定額を確認してください。";
     } else if (state.adjustmentMode === "organizer") {
-      note = `丸め差額 ${signedYen(total - roundedTotal)} は幹事側で調整します。`;
+      const organizer = applyOrganizerAdjustment(rows, adjustment);
+      note = organizer
+        ? `丸め差額 ${signedYen(total - roundedTotal)} は幹事（${organizer.name}）で調整しています。`
+        : `丸め差額 ${signedYen(total - roundedTotal)} は幹事未指定のため表示のみです。`;
     } else if (state.adjustmentMode === "top") {
       applyTopAdjustment(rows, adjustment);
       note = "丸め差額は最も倍率が高い参加者で調整しています。";
@@ -352,6 +421,16 @@
       difference: total - finalTotal,
       note,
     };
+  }
+
+  function applyOrganizerAdjustment(rows, adjustment) {
+    if (rows.length === 0 || adjustment === 0) return rows.find((row) => row.isOrganizer) || null;
+
+    const organizer = rows.find((row) => row.isOrganizer);
+    if (!organizer) return null;
+
+    organizer.finalAmount = Math.max(0, organizer.finalAmount + adjustment);
+    return organizer;
   }
 
   function applyTopAdjustment(rows, adjustment) {
@@ -389,7 +468,7 @@
     }
 
     const title = state.eventName ? `【${state.eventName} 清算】` : "【飲み会清算】";
-    const lines = latestResult.rows.map((row) => `${row.name}　${yen(row.finalAmount)}`);
+    const lines = latestResult.rows.map((row) => `${row.name}${row.isOrganizer ? "（幹事）" : ""}　${yen(row.finalAmount)}`);
     const text = [title, "", ...lines, "", `合計：${yen(latestResult.finalTotal)}`].join("\n");
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -426,12 +505,53 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
+  function saveMemberTemplate() {
+    if (state.members.length === 0) {
+      showToast("保存する参加者がいません");
+      return;
+    }
+
+    const members = state.members.map(({ id, name, role, adjustment, attendance, rate, fixedAmount }) => ({
+      id,
+      name,
+      role,
+      adjustment,
+      attendance,
+      rate,
+      fixedAmount,
+    }));
+    localStorage.setItem(TEMPLATE_KEY, JSON.stringify({ members, organizerId: state.organizerId }));
+    showToast("参加者テンプレをこの端末に保存しました");
+  }
+
+  function loadMemberTemplate() {
+    const saved = localStorage.getItem(TEMPLATE_KEY);
+    if (!saved) {
+      showToast("参加者テンプレがありません");
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      const members = Array.isArray(parsed.members) ? parsed.members.map(normalizeMember) : [];
+      state.members = members.map((member) => ({ ...member, id: createId() }));
+      const oldOrganizerIndex = members.findIndex((member) => member.id === parsed.organizerId);
+      state.organizerId = oldOrganizerIndex >= 0 && state.members[oldOrganizerIndex] ? state.members[oldOrganizerIndex].id : "";
+      renderMembers();
+      renderResults();
+      persistQuietly();
+      showToast("参加者テンプレを読み込みました");
+    } catch {
+      showToast("テンプレを読み込めませんでした");
+    }
+  }
+
   function persistQuietly() {
     saveState();
   }
 
   function loadState() {
-    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEY) || LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
     if (!saved) return;
 
     try {
@@ -440,7 +560,11 @@
       state.totalAmount = Number(parsed.totalAmount) || 0;
       state.roundUnit = Number(parsed.roundUnit) || 100;
       state.adjustmentMode = parsed.adjustmentMode || "organizer";
+      state.organizerId = parsed.organizerId || "";
       state.members = Array.isArray(parsed.members) ? parsed.members.map(normalizeMember) : [];
+      if (!state.members.some((member) => member.id === state.organizerId)) {
+        state.organizerId = "";
+      }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -454,22 +578,24 @@
     state.totalAmount = 0;
     state.roundUnit = 100;
     state.adjustmentMode = "organizer";
+    state.organizerId = "";
     state.members = [];
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
     renderAll();
     showToast("リセットしました");
   }
 
   function updateNewRateFromPresets() {
     if (elements.newRate.dataset.custom === "true") return;
-    elements.newRate.value = formatInputNumber(getCombinedRate(elements.newRole.value, elements.newAdjustment.value));
+    elements.newRate.value = formatInputNumber(getCombinedRate(elements.newRole.value, elements.newAdjustment.value, elements.newAttendance.value));
   }
 
-  function getCombinedRate(roleName, adjustmentName) {
+  function getCombinedRate(roleName, adjustmentName, attendanceName) {
     const role = findRole(roleName);
     const adjustment = findAdjustment(adjustmentName);
-    return roundRate((role ? role.rate : 1) * (adjustment ? adjustment.rate : 1));
+    const attendance = findAttendance(attendanceName);
+    return roundRate((role ? role.rate : 1) * (adjustment ? adjustment.rate : 1) * (attendance ? attendance.rate : 1));
   }
 
   function findRole(name) {
@@ -480,9 +606,15 @@
     return adjustments.find((adjustment) => adjustment.name === name);
   }
 
+  function findAttendance(name) {
+    return attendanceAdjustments.find((attendance) => attendance.name === name);
+  }
+
   function normalizeMember(member) {
-    const role = normalizeRole(member.role || member.category);
-    const adjustment = normalizeAdjustment(member.adjustment || member.category);
+    const legacyCategory = member.category;
+    const role = normalizeRole(member.role || legacyCategory);
+    const adjustment = normalizeAdjustment(member.adjustment || legacyCategory);
+    const attendance = normalizeAttendance(member.attendance);
     const savedRate = Number(member.rate);
 
     return {
@@ -490,7 +622,8 @@
       name: member.name || "",
       role,
       adjustment,
-      rate: Number.isFinite(savedRate) && savedRate > 0 ? savedRate : getCombinedRate(role, adjustment),
+      attendance,
+      rate: Number.isFinite(savedRate) && savedRate > 0 ? savedRate : getCombinedRate(role, adjustment, attendance),
       fixedAmount: Math.max(0, Number(member.fixedAmount) || 0),
     };
   }
@@ -500,7 +633,12 @@
   }
 
   function normalizeAdjustment(value) {
+    if (value === "パート") return "なし";
     return findAdjustment(value) ? value : "なし";
+  }
+
+  function normalizeAttendance(value) {
+    return findAttendance(value) ? value : "通常";
   }
 
   function roundRate(value) {
