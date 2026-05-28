@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>飲み会清算ツール</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Local only</p>
+          <h1>飲み会清算</h1>
+        </div>
+        <p class="privacy-note">通信なし・端末内保存</p>
+      </header>
+
+      <section class="panel" aria-labelledby="event-heading">
+        <div class="section-title">
+          <span class="step">1</span>
+          <h2 id="event-heading">イベント設定</h2>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>イベント名</span>
+            <input id="eventName" type="text" autocomplete="off" placeholder="例：部署飲み">
+          </label>
+
+          <label class="field total-field">
+            <span>総額</span>
+            <input id="totalAmount" type="number" inputmode="numeric" min="0" step="1" placeholder="50000">
+          </label>
+
+          <label class="field">
+            <span>丸め単位</span>
+            <select id="roundUnit">
+              <option value="1">1円</option>
+              <option value="10">10円</option>
+              <option value="100" selected>100円</option>
+              <option value="500">500円</option>
+              <option value="1000">1000円</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>差額調整</span>
+            <select id="adjustmentMode">
+              <option value="organizer">幹事負担</option>
+              <option value="top">最上位役職へ加算</option>
+              <option value="all">全員均等</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="member-heading">
+        <div class="section-title">
+          <span class="step">2</span>
+          <h2 id="member-heading">参加者</h2>
+        </div>
+        <div id="memberList" class="member-list" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="add-heading">
+        <div class="section-title">
+          <span class="step">3</span>
+          <h2 id="add-heading">参加者追加</h2>
+        </div>
+
+        <div class="add-grid">
+          <label class="field">
+            <span>名前</span>
+            <input id="newName" type="text" autocomplete="off" placeholder="田中">
+          </label>
+
+          <label class="field">
+            <span>役職</span>
+            <select id="newRole"></select>
+          </label>
+
+          <label class="field">
+            <span>調整</span>
+            <select id="newAdjustment"></select>
+          </label>
+
+          <label class="field small-field">
+            <span>倍率</span>
+            <input id="newRate" type="number" inputmode="decimal" min="0" step="0.1">
+          </label>
+
+          <label class="field small-field">
+            <span>固定額</span>
+            <input id="newFixed" type="number" inputmode="numeric" min="0" step="1" placeholder="任意">
+          </label>
+        </div>
+
+        <button id="addMember" class="primary-button" type="button">＋ 参加者追加</button>
+      </section>
+
+      <section class="panel result-panel" aria-labelledby="result-heading">
+        <div class="section-title">
+          <span class="step">4</span>
+          <h2 id="result-heading">結果</h2>
+        </div>
+
+        <div class="summary-grid">
+          <div>
+            <span>合計</span>
+            <strong id="summaryTotal">0円</strong>
+          </div>
+          <div>
+            <span>丸め後合計</span>
+            <strong id="summaryRounded">0円</strong>
+          </div>
+          <div>
+            <span>差額</span>
+            <strong id="summaryDifference">0円</strong>
+          </div>
+        </div>
+
+        <p id="calculationNote" class="calculation-note"></p>
+        <div id="resultList" class="result-list"></div>
+      </section>
+    </main>
+
+    <div class="bottom-bar">
+      <button id="copyLine" class="primary-button" type="button">LINE用コピー</button>
+      <button id="saveData" class="secondary-button" type="button">保存</button>
+      <button id="resetData" class="danger-button" type="button">リセット</button>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="script.js"></script>
+  </body>
+</html>
