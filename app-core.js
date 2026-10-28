@@ -1,6 +1,6 @@
 (function (root) {
   'use strict';
-  const ROLES = {社長:4000,部長:2000,室長:2000,次長:1500,課長:1000,調査役:500,一般:0};
+  const ROLES = {社長:4000,役員:3000,部長:2000,室長:2000,次長:1500,課長:1000,調査役:500,一般:0};
   const WORK = {正社員:0,嘱託:-500,パート:-1000};
   const UNITS = [1,10,100,500,1000];
   const LEVELS = [0,0.5,1,1.5];
@@ -8,6 +8,12 @@
   const id = () => root.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const member = (name = '') => ({id:id(),name,role:'一般',employment:'正社員',gender:'未設定',included:true,fixedAmount:null,offset:0,rate:1,collected:false});
+  // 保存済みの差額は維持し、新しい役職だけを選択肢に補う。履歴の原本は変更しない。
+  function roleRulesFor(e) {
+    const rules={...e.roleRules};
+    if(!Object.hasOwn(rules,'役員'))rules['役員']=ROLES['役員'];
+    return Object.fromEntries([...Object.keys(ROLES).filter(name=>Object.hasOwn(rules,name)),...Object.keys(rules).filter(name=>!Object.hasOwn(ROLES,name))].map(name=>[name,rules[name]]));
+  }
   function event() {
     return {id:id(),eventName:'',date:today(),totalAmount:null,subsidy:0,roundUnit:100,adjustmentMode:'organizer',organizerId:'',paymentMode:'amount',roleLevel:1,workLevel:1,genderLevel:0,roleRules:{...ROLES},workRules:{...WORK},members:[]};
   }
@@ -72,7 +78,7 @@
     return result;
   }
   function nextEvent(source,{keepTotal=false}={}){
-    const next=clone(source);next.id=id();next.date=today();next.eventName='';
+    const next=clone(source);next.roleRules=roleRulesFor(source);next.id=id();next.date=today();next.eventName='';
     if(!keepTotal){next.totalAmount=null;next.subsidy=0;}
     next.members.forEach(m=>{m.included=true;m.collected=false;});return next;
   }
@@ -157,6 +163,6 @@
     if(result.error)throw Error(result.error);
     return [`【${e.eventName||'飲み会'} 清算】`,e.date,'',...result.rows.filter(m=>m.included).map(m=>`${m.name||'名無し'}${m.id===e.organizerId?'（幹事）':''}　${m.finalAmount.toLocaleString()}円`),'',`会計：${e.totalAmount.toLocaleString()}円`,...(e.subsidy?[`補助：${e.subsidy.toLocaleString()}円`]:[]),`参加者の負担合計：${result.netAmount.toLocaleString()}円`].join('\n');
   }
-  const api={ROLES,WORK,UNITS,LEVELS,clone,id,today,member,event,documentData,calculate,nextEvent,clearCollection,templateFrom,finalize,validateEvent,validateDocument,migrateEvent,migrateTemplateEvent,migrateStorage,lineText};
+  const api={ROLES,WORK,UNITS,LEVELS,roleRulesFor,clone,id,today,member,event,documentData,calculate,nextEvent,clearCollection,templateFrom,finalize,validateEvent,validateDocument,migrateEvent,migrateTemplateEvent,migrateStorage,lineText};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.NomikaiCore=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
